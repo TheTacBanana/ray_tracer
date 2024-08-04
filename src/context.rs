@@ -6,7 +6,7 @@ use instant::Instant;
 use wgpu::{util::DeviceExt, CommandEncoder, TextureView};
 
 use crate::{
-    camera::{Camera, CameraWithBuffers}, pipeline::Pipeline, thread_context::ThreadContext, vertex::Vertex
+    camera::{Camera, CameraWithBuffers}, pipeline::Pipeline, sphere::{self, Sphere, SpheresWithBuffers, Spheres}, thread_context::ThreadContext, vertex::Vertex
 };
 
 use super::window::Window;
@@ -21,6 +21,7 @@ pub struct GraphicsContext {
 
     pub pipeline: Pipeline,
     pub camera: CameraWithBuffers,
+    pub spheres: SpheresWithBuffers,
 }
 
 impl GraphicsContext {
@@ -95,17 +96,26 @@ impl GraphicsContext {
         };
         surface.configure(&device, &config);
 
-        // Create buffers, pipelines, shaders for use within the program
-        // let image_display = ImageDisplayWithBuffers::from_window(&device, &window.raw);
-        // let pipelines = Pipelines::new(&device, surface_format, &image_display.layout).await;
-
         let buffers = GraphicsContext::create_buffers(&device);
         let camera = Camera::new(&device, [
             window.raw.inner_size().width as f32,
             window.raw.inner_size().height as f32,
         ]);
 
-        let pipeline = Pipeline::new(&device, &camera.layout).await;
+
+        let spheres = Spheres {
+            spheres: vec![
+                Sphere {
+                    pos: [0.0, 0.0, 0.0],
+                    radius: 1.0,
+                }
+
+            ],
+        };
+
+        let sphere_buffers = Sphere::new_sphere_buffers(spheres, &device);
+
+        let pipeline = Pipeline::new(&device, &camera.layout, &sphere_buffers.layout).await;
 
         Self {
             surface,
@@ -117,6 +127,7 @@ impl GraphicsContext {
 
             pipeline,
             camera,
+            spheres: sphere_buffers,
         }
     }
 
@@ -165,7 +176,7 @@ impl GraphicsContext {
 
 
     /// Perform all render tasks per frame
-    pub fn render(&mut self, window: &winit::window::Window) -> Result<()> {
+    pub fn render(&mut self) -> Result<()> {
         self.queue.write_buffer(
             &self.camera.buffer,
             0,
@@ -202,6 +213,7 @@ impl GraphicsContext {
 
             render_pass.set_pipeline(&self.pipeline.pipeline);
             render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
+            render_pass.set_bind_group(1, &self.spheres.bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.buffers.0.slice(..));
             render_pass.set_index_buffer(self.buffers.1.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..GraphicsContext::INDICES.len() as u32, 0, 0..1);
@@ -212,15 +224,4 @@ impl GraphicsContext {
 
         Ok(())
     }
-
-    pub fn render_pass(
-        &self,
-        encoder: &mut CommandEncoder,
-        pipeline: &wgpu::RenderPipeline,
-        tex_out: &wgpu::TextureView,
-        // clear: bool,
-    ) {
-
-    }
-
 }

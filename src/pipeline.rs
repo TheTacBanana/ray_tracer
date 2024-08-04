@@ -6,7 +6,11 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub async fn new(device: &wgpu::Device, camera_layout: &wgpu::BindGroupLayout) -> Self {
+    pub async fn new(
+        device: &wgpu::Device,
+        camera_layout: &wgpu::BindGroupLayout,
+        spheres_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let shader = Pipeline::load_shader(device, "./src/raytrace.wgsl").await;
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {

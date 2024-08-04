@@ -10,6 +10,7 @@ pub mod vertex;
 pub mod thread_context;
 pub mod pipeline;
 pub mod camera;
+pub mod sphere;
 
 /// Load bytes from path, if compiled for web then do via http request
 pub async fn load_bytes(path: &str) -> Result<Vec<u8>> {
@@ -52,7 +53,7 @@ pub async fn run() {
         match event {
             // Render everything
             Event::RedrawRequested(_) => {
-                context.render(window).unwrap();
+                context.render().unwrap();
             }
             // Trigger a resize
             Event::WindowEvent {

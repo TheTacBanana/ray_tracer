@@ -19,6 +19,14 @@ struct RayHit {
     ray: Ray,
 }
 
+@group(1) @binding(0)
+var<storage, read> spheres: Spheres;
+
+struct Spheres {
+    @align(16)
+    spheres: array<Sphere>,
+};
+
 struct Sphere {
     pos: vec3<f32>,
     radius: f32,
@@ -42,10 +50,15 @@ fn vs_main(
     return out;
 }
 
+// fn hit_sphere(ray: Ray) {
+//     for (var i = 0; i < 10; i++) {
+//     counter += 1;
+//   }
+// }
+
 fn ray_colour(ray: Ray) -> vec3<f32> {
-    var unit: vec3<f32> = normalize(ray.dir);
-    var a = 0.5*(unit.y + 1.0);
-    return (1.0-a)*vec3<f32>(1.0, 1.0, 1.0) + a*vec3<f32>(0.5, 0.7, 1.0);
+    var a = 0.5 * (normalize(ray.dir).y + 1.0);
+    return (1.0 - a) *vec3<f32>(1.0, 1.0, 1.0) + a * vec3<f32>(0.5, 0.7, 1.0);
 }
 
 fn calc_ray(screen_pos: vec2<f32>) -> Ray {
@@ -84,5 +97,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     var colour = ray_colour(ray);
 
-    return vec4<f32>(ray.pos, 1.0);
+    return vec4<f32>(colour, 1.0);
 }
