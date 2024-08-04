@@ -1,19 +1,17 @@
 use crate::{load_bytes, vertex::Vertex};
 
-
-
 pub struct Pipeline {
     // layout: wgpu::BindGroupLayout,
     pub pipeline: wgpu::RenderPipeline,
 }
 
 impl Pipeline {
-    pub async fn new(device: &wgpu::Device) -> Self {
+    pub async fn new(device: &wgpu::Device, camera_layout: &wgpu::BindGroupLayout) -> Self {
         let shader = Pipeline::load_shader(device, "./src/raytrace.wgsl").await;
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("render_pipeline_layout"),
-            bind_group_layouts: &[],
+            bind_group_layouts: &[camera_layout],
             push_constant_ranges: &[],
         });
 
@@ -31,9 +29,9 @@ impl Pipeline {
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Bgra8UnormSrgb,
                     blend: Some(wgpu::BlendState {
-                            color: wgpu::BlendComponent::REPLACE,
-                            alpha: wgpu::BlendComponent::REPLACE,
-                        }),
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
@@ -55,34 +53,7 @@ impl Pipeline {
             multiview: None,
         });
 
-        Pipeline {
-            pipeline,
-        }
-
-    }
-
-    fn create_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("texture_bind_group_layout"),
-        })
+        Pipeline { pipeline }
     }
 
     async fn load_shader(device: &wgpu::Device, path: &str) -> wgpu::ShaderModule {
@@ -93,5 +64,4 @@ impl Pipeline {
             )),
         })
     }
-
 }

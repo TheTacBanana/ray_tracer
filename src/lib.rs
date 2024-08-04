@@ -9,6 +9,7 @@ pub mod window;
 pub mod vertex;
 pub mod thread_context;
 pub mod pipeline;
+pub mod camera;
 
 /// Load bytes from path, if compiled for web then do via http request
 pub async fn load_bytes(path: &str) -> Result<Vec<u8>> {

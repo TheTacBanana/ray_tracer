@@ -3,7 +3,7 @@ pkgs.mkShell rec {
   buildInputs = with pkgs; [
         pkg-config
         openssl.dev
-        glib
+        glib.dev
         atk.dev
         gtk3.dev
 
@@ -20,19 +20,7 @@ pkgs.mkShell rec {
         vulkan-headers vulkan-loader
         vulkan-tools vulkan-tools-lunarg
         vulkan-extension-layer
-        vulkan-validation-layers # don't need them *strictly* but immensely helpful
-
-        # necessary for developing (all of) wgpu itself
-        # cargo-nextest cargo-fuzz
-
-        # nice for developing wgpu itself
-        # typos
-
-        # nice tools
-        # gdb rr
-        # evcxr
-        # valgrind
-        # renderdoc
+        vulkan-validation-layers
      ];
 
 shellHook = ''

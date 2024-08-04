@@ -1,7 +1,13 @@
 @group(0) @binding(0)
-var t_diffuse: texture_2d<f32>;
-@group(0) @binding(1)
-var s_diffuse: sampler;
+var<uniform> camera : Camera;
+
+struct Camera {
+    dimensions: vec2<f32>,
+    fov: f32,
+    pos: vec3<f32>,
+    up: vec3<f32>,
+    right: vec3<f32>,
+}
 
 // Vertex shader
 struct VertexInput {
@@ -24,5 +30,5 @@ fn vs_main(
 // Fragment shader
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(0.25);
+    return vec4<f32>(in.clip_position.x/camera.dimensions.x, in.clip_position.y/camera.dimensions.y, 0.0, 0.0);
 }

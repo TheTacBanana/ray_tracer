@@ -6,7 +6,7 @@ use instant::Instant;
 use wgpu::{util::DeviceExt, CommandEncoder, TextureView};
 
 use crate::{
-    pipeline::Pipeline, thread_context::ThreadContext, vertex::Vertex
+    camera::{Camera, CameraWithBuffers}, pipeline::Pipeline, thread_context::ThreadContext, vertex::Vertex
 };
 
 use super::window::Window;
@@ -16,10 +16,11 @@ pub struct GraphicsContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
-    pub pipeline: Pipeline,
     pub buffers: (wgpu::Buffer, wgpu::Buffer),
-    pub texture_sampler: wgpu::Sampler,
     pub thread: ThreadContext,
+
+    pub pipeline: Pipeline,
+    pub camera: CameraWithBuffers,
 }
 
 impl GraphicsContext {
@@ -98,28 +99,25 @@ impl GraphicsContext {
         // let image_display = ImageDisplayWithBuffers::from_window(&device, &window.raw);
         // let pipelines = Pipelines::new(&device, surface_format, &image_display.layout).await;
 
-        let texture_sampler = GraphicsContext::create_sampler(&device);
         let buffers = GraphicsContext::create_buffers(&device);
+        let camera = Camera::new(&device, [
+            window.raw.inner_size().width as f32,
+            window.raw.inner_size().height as f32,
+        ]);
 
-        let pipeline = Pipeline::new(&device).await;
+        let pipeline = Pipeline::new(&device, &camera.layout).await;
 
-        let mut context = Self {
+        Self {
             surface,
             device,
             queue,
-            pipeline,
             config,
             buffers,
-            texture_sampler,
             thread: ThreadContext::default(),
-        };
 
-        // Load the texture into the empty render group
-        // context
-        //     .load_texture(include_bytes!("../assets/raytrace.jpg"))
-        //     .unwrap();
-
-        context
+            pipeline,
+            camera,
+        }
     }
 
     /// Create vertex and index buffers
@@ -158,12 +156,22 @@ impl GraphicsContext {
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
+
+            let dims = &mut self.camera.camera.screen_dimensions;
+            dims[0] = width as f32;
+            dims[1] = height as f32;
         }
     }
 
 
     /// Perform all render tasks per frame
     pub fn render(&mut self, window: &winit::window::Window) -> Result<()> {
+        self.queue.write_buffer(
+            &self.camera.buffer,
+            0,
+            bytemuck::bytes_of(&self.camera.camera),
+        );
+
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -176,15 +184,28 @@ impl GraphicsContext {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.render_pass(
-            &mut encoder,
-            &self.pipeline.pipeline,
-            &output_view
-            // &[
-            //     Binding(0, &self.texture_render_group.bind_group),
-            //     Binding(1, &self.image_display.bind_group),
-            // ],
-        );
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &output_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load:  wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+
+            render_pass.set_pipeline(&self.pipeline.pipeline);
+            render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.buffers.0.slice(..));
+            render_pass.set_index_buffer(self.buffers.1.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..GraphicsContext::INDICES.len() as u32, 0, 0..1);
+        }
 
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
@@ -199,29 +220,7 @@ impl GraphicsContext {
         tex_out: &wgpu::TextureView,
         // clear: bool,
     ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &tex_out,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load:  wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-        });
 
-        // Bind everything and draw
-        render_pass.set_pipeline(&pipeline);
-        // for Binding(index, bind_group) in bindings {
-        //     render_pass.set_bind_group(*index, bind_group, &[])
-        // }
-        render_pass.set_vertex_buffer(0, self.buffers.0.slice(..));
-        render_pass.set_index_buffer(self.buffers.1.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..GraphicsContext::INDICES.len() as u32, 0, 0..1);
     }
 
 }
