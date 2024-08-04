@@ -106,8 +106,8 @@ impl GraphicsContext {
         let spheres = Spheres {
             spheres: vec![
                 Sphere {
-                    pos: [0.0, 0.0, 0.0],
-                    radius: 1.0,
+                    pos: [0.0, 0.0, -1.0],
+                    radius: 0.5,
                 }
 
             ],

@@ -15,7 +15,7 @@ impl Pipeline {
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("render_pipeline_layout"),
-            bind_group_layouts: &[camera_layout],
+            bind_group_layouts: &[camera_layout, spheres_layout],
             push_constant_ranges: &[],
         });
 

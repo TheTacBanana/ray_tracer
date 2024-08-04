@@ -24,7 +24,7 @@ impl Camera {
             screen_dimensions: dimensions,
             focal: 1.0,
             viewport_height: 2.0,
-            pos: [0.0, -3.0, 0.0],
+            pos: [0.0, 0.0, 0.0],
             _pad: Default::default(),
         };
 
