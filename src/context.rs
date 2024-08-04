@@ -6,7 +6,11 @@ use instant::Instant;
 use wgpu::{util::DeviceExt, CommandEncoder, TextureView};
 
 use crate::{
-    camera::{Camera, CameraWithBuffers}, pipeline::Pipeline, sphere::{self, Sphere, SpheresWithBuffers, Spheres}, thread_context::ThreadContext, vertex::Vertex
+    camera::{Camera, CameraWithBuffers},
+    pipeline::Pipeline,
+    sphere::{self, Sphere, Spheres, SpheresWithBuffers},
+    thread_context::ThreadContext,
+    vertex::Vertex,
 };
 
 use super::window::Window;
@@ -97,19 +101,28 @@ impl GraphicsContext {
         surface.configure(&device, &config);
 
         let buffers = GraphicsContext::create_buffers(&device);
-        let camera = Camera::new(&device, [
-            window.raw.inner_size().width as f32,
-            window.raw.inner_size().height as f32,
-        ]);
-
+        let camera = Camera::new(
+            &device,
+            [
+                window.raw.inner_size().width as f32,
+                window.raw.inner_size().height as f32,
+            ],
+        );
 
         let spheres = Spheres {
             spheres: vec![
                 Sphere {
-                    pos: [0.0, 0.0, -1.0],
-                    radius: 0.5,
-                }
-
+                    pos: [-0.2, 0.0, -1.0],
+                    radius: 0.4,
+                    colour: [1.0, 0.0, 0.0],
+                    reflection: 0.0,
+                },
+                Sphere {
+                    pos: [0.4, 0.0, -2.0],
+                    radius: 0.25,
+                    colour: [0.0, 1.0, 0.0],
+                    reflection: 0.0,
+                },
             ],
         };
 
@@ -174,7 +187,6 @@ impl GraphicsContext {
         }
     }
 
-
     /// Perform all render tasks per frame
     pub fn render(&mut self) -> Result<()> {
         self.queue.write_buffer(
@@ -202,7 +214,7 @@ impl GraphicsContext {
                     view: &output_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load:  wgpu::LoadOp::Load,
+                        load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,
                     },
                 })],

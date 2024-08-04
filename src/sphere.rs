@@ -16,6 +16,8 @@ pub struct Spheres {
 pub struct Sphere {
     pub pos: [f32; 3],
     pub radius: f32,
+    pub colour: [f32; 3],
+    pub reflection: f32,
 }
 
 impl Sphere {

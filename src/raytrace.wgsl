@@ -15,8 +15,10 @@ struct Ray {
 
 struct RayHit {
     hit: bool,
-    pos: vec3<f32>,
-    ray: Ray,
+    incoming: vec3<f32>,
+    distance: f32,
+    normal: vec3<f32>,
+    colour: vec3<f32>,
 }
 
 @group(1) @binding(0)
@@ -30,6 +32,8 @@ struct Spheres {
 struct Sphere {
     pos: vec3<f32>,
     radius: f32,
+    colour: vec3<f32>,
+    reflection: f32,
 }
 
 // Vertex shader
@@ -50,7 +54,7 @@ fn vs_main(
     return out;
 }
 
-fn hit_sphere(sphere: Sphere, ray: Ray) -> f32 {
+fn hit_sphere(sphere: Sphere, ray: Ray) -> RayHit {
     var dif: vec3<f32> = ray.pos - sphere.pos;
     var x: f32 = dot(dif, ray.dir);
     var y: f32 = dot(dif, dif) - (sphere.radius * sphere.radius);
@@ -61,23 +65,47 @@ fn hit_sphere(sphere: Sphere, ray: Ray) -> f32 {
         var xy = sqrt(d);
         var root1 = -x - xy;
         if (root1 >= 0.0) {
-            return root1;
+            var ray_hit : RayHit;
+            ray_hit.hit = true;
+            ray_hit.incoming = ray.dir;
+            ray_hit.distance = root1;
+            ray_hit.normal = normalize((ray.pos + root1 * ray.dir) - sphere.pos);
+            ray_hit.colour = sphere.colour;
+            return ray_hit;
         }
         var root2 = -x + xy;
         if (root2 >= 0.0) {
-            return root2;
+            var ray_hit : RayHit;
+            ray_hit.hit = true;
+            ray_hit.incoming = ray.dir;
+            ray_hit.distance = root2;
+            ray_hit.normal = normalize((ray.pos + root2 * ray.dir) - sphere.pos);
+            ray_hit.colour = sphere.colour;
+            return ray_hit;
         }
     }
-    return -1.0;
+    var ray_hit : RayHit;
+    return ray_hit;
 }
 
 fn ray_colour(ray: Ray) -> vec3<f32> {
+    var hit : bool = false;
+    var closest : RayHit;
     for (var i = 0; i < i32(arrayLength(&spheres.spheres)); i += 1) {
-        var t = hit_sphere(spheres.spheres[i], ray);
-        if (t > 0.0) {
-            var N = normalize((ray.pos + t * ray.dir) - vec3<f32>(0.0, 0.0, -1.0));
-            return 0.5 * vec3<f32>(N.x + 1.0, N.y + 1.0, N.z + 1.0);
+        var sphere = spheres.spheres[i];
+        var ray_hit = hit_sphere(spheres.spheres[i], ray);
+
+        if ray_hit.hit {
+            if (!hit || closest.distance >= ray_hit.distance) {
+                closest = ray_hit;
+                hit = true;
+            }
         }
+    }
+    if hit {
+        var n = closest.normal;
+        return closest.colour;
+        // return 0.5 * vec3<f32>(n.x + 1.0, n.y + 1.0, n.z + 1.0);
     }
 
     var a = 0.5 * (normalize(ray.dir).y + 1.0);
@@ -117,6 +145,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     );
 
     var colour = ray_colour(ray);
-
     return vec4<f32>(colour, 1.0);
 }
