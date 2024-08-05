@@ -7,16 +7,17 @@ var<storage, read> spheres: Spheres;
 const SAMPLE_COUNT = 4;
 const SAMPLES = array<vec2<f32>, SAMPLE_COUNT>(
     vec2<f32>(-0.25, -0.25),
-    vec2<f32>(-0.25,  0.25),
-    vec2<f32>( 0.25, -0.25),
-    vec2<f32>( 0.25,  0.25),
+    vec2<f32>(-0.25, 0.25),
+    vec2<f32>(0.25, -0.25),
+    vec2<f32>(0.25, 0.25),
 );
 
 struct Camera {
     dimensions: vec2<f32>,
     focal: f32,
     viewport_height: f32,
-    pos: f32,
+    pos: vec3<f32>,
+    max_depth: i32,
 }
 
 struct Ray {
@@ -26,10 +27,11 @@ struct Ray {
 
 struct RayHit {
     hit: bool,
-    incoming: vec3<f32>,
     distance: f32,
+    pos: vec3<f32>,
     normal: vec3<f32>,
     colour: vec3<f32>,
+    reflection: f32,
 }
 
 struct Spheres {
@@ -62,6 +64,37 @@ fn vs_main(
     return out;
 }
 
+var<private> seed: f32 = 0.0;
+
+fn base_hash(p: vec2<u32>) -> u32 {
+    var p_shifted = vec2<u32>(p.x >> u32(1), p.y >> u32(1));
+    var q = u32(1103515245) * ((p_shifted) ^ (p.yx));
+    var h32 = u32(1103515245) * ((q.x) ^ (q.y >> u32(3)));
+    return h32 ^ (h32 >> u32(16));
+}
+
+fn hash3(seed: ptr<private, f32>) -> vec3<f32> {
+    var l = *seed;
+    *seed += 0.1;
+    var r = *seed;
+    *seed += 0.1;
+
+    var n = base_hash(vec2<u32>(vec2<f32>(l, r)));
+    var rz = vec3<u32>(
+        n & u32(0x7fffffff),
+        (n * u32(16807)) & u32(0x7fffffff),
+        (n * u32(48271)) & u32(0x7fffffff)
+    );
+    return vec3<f32>(rz) / f32(0x7fffffff);
+}
+
+fn random_in_unit_sphere(seed: ptr<private, f32>) -> vec3<f32> {
+    var h = hash3(seed) * vec3<f32>(2., 6.28318530718, 1.) - vec3<f32>(1.0, 0.0, 0.0);
+    var phi = h.y;
+    var r = pow(h.z, 1. / 3.);
+    return r * vec3(sqrt(1. - h.x * h.x) * vec2(sin(phi), cos(phi)), h.x);
+}
+
 fn hit_sphere(sphere: Sphere, ray: Ray) -> RayHit {
     var dif: vec3<f32> = ray.pos - sphere.pos;
     var x: f32 = dot(dif, ray.dir);
@@ -75,20 +108,26 @@ fn hit_sphere(sphere: Sphere, ray: Ray) -> RayHit {
         if root1 >= 0.0 {
             var ray_hit: RayHit;
             ray_hit.hit = true;
-            ray_hit.incoming = ray.dir;
             ray_hit.distance = root1;
-            ray_hit.normal = normalize((ray.pos + root1 * ray.dir) - sphere.pos);
+            ray_hit.pos = ray.pos + root1 * ray.dir;
+            ray_hit.normal = normalize(ray_hit.pos - sphere.pos);
+
             ray_hit.colour = sphere.colour;
+            ray_hit.reflection = sphere.reflection;
+
             return ray_hit;
         }
         var root2 = -x + xy;
         if root2 >= 0.0 {
             var ray_hit: RayHit;
             ray_hit.hit = true;
-            ray_hit.incoming = ray.dir;
             ray_hit.distance = root2;
-            ray_hit.normal = normalize((ray.pos + root2 * ray.dir) - sphere.pos);
+            ray_hit.pos = ray.pos + root2 * ray.dir;
+            ray_hit.normal = normalize(ray_hit.pos - sphere.pos);
+
             ray_hit.colour = sphere.colour;
+            ray_hit.reflection = sphere.reflection;
+
             return ray_hit;
         }
     }
@@ -96,7 +135,35 @@ fn hit_sphere(sphere: Sphere, ray: Ray) -> RayHit {
     return ray_hit;
 }
 
-fn ray_colour(ray: Ray) -> vec3<f32> {
+fn sky_colour(ray: Ray) -> vec3<f32> {
+    var a = 0.5 * (normalize(ray.dir).y + 1.0);
+    return (1.0 - a) * vec3<f32>(1.0, 1.0, 1.0) + a * vec3<f32>(0.5, 0.7, 1.0);
+}
+
+fn iterative_ray_colour(ray: Ray) -> vec3<f32> {
+    var cumulative_colour: vec3<f32>;
+    var colour_multiplier: f32 = 1.0;
+
+    var current_ray: Ray = ray;
+
+    for (var depth = 0; depth < camera.max_depth; depth += 1) {
+        var hit_out = cast_ray(current_ray);
+        if hit_out.hit {
+            // cumulative_colour += colour_multiplier;
+            colour_multiplier *= hit_out.reflection;
+
+            var direction = hit_out.normal * 1.0001 + random_in_unit_sphere(&seed);
+            current_ray.dir = direction;
+            current_ray.pos = hit_out.pos;
+        } else {
+            cumulative_colour += colour_multiplier * sky_colour(ray);
+            break;
+        }
+    }
+    return cumulative_colour;
+}
+
+fn cast_ray(ray: Ray) -> RayHit {
     var hit: bool = false;
     var closest: RayHit;
     for (var i = 0; i < i32(arrayLength(&spheres.spheres)); i += 1) {
@@ -110,13 +177,7 @@ fn ray_colour(ray: Ray) -> vec3<f32> {
             }
         }
     }
-    if hit {
-        var n = closest.normal;
-        return closest.colour;
-    }
-
-    var a = 0.5 * (normalize(ray.dir).y + 1.0);
-    return (1.0 - a) * vec3<f32>(1.0, 1.0, 1.0) + a * vec3<f32>(0.5, 0.7, 1.0);
+    return closest;
 }
 
 fn calc_ray(screen_pos: vec2<f32>) -> Ray {
@@ -141,12 +202,12 @@ fn calc_ray(screen_pos: vec2<f32>) -> Ray {
     return ray;
 }
 
-fn cast_multiple_rays(origin: vec2<f32>) -> vec3<f32>{
-    var pixel_colour : vec3<f32>;
-    pixel_colour += ray_colour(calc_ray(origin + SAMPLES[0]));
-    pixel_colour += ray_colour(calc_ray(origin + SAMPLES[1]));
-    pixel_colour += ray_colour(calc_ray(origin + SAMPLES[2]));
-    pixel_colour += ray_colour(calc_ray(origin + SAMPLES[3]));
+fn cast_multiple_rays(origin: vec2<f32>) -> vec3<f32> {
+    var pixel_colour: vec3<f32>;
+    pixel_colour += iterative_ray_colour(calc_ray(origin + SAMPLES[0]));
+    pixel_colour += iterative_ray_colour(calc_ray(origin + SAMPLES[1]));
+    pixel_colour += iterative_ray_colour(calc_ray(origin + SAMPLES[2]));
+    pixel_colour += iterative_ray_colour(calc_ray(origin + SAMPLES[3]));
     return pixel_colour / 4.0;
 }
 

@@ -15,7 +15,8 @@ pub struct Camera {
     pub focal: f32,
     pub viewport_height : f32,
     pub pos: [f32; 3],
-    _pad: f32,
+    pub max_depth : i32,
+    _pad: [f32; 0],
 }
 
 impl Camera {
@@ -25,11 +26,12 @@ impl Camera {
             focal: 1.0,
             viewport_height: 2.0,
             pos: [0.0, 0.0, 0.0],
+            max_depth: 5,
             _pad: Default::default(),
         };
 
         // Create layout entrys
-        let entries = (0..=4)
+        let entries = (0..=6)
             .map(|i| wgpu::BindGroupLayoutEntry {
                 binding: i,
                 visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
@@ -56,7 +58,7 @@ impl Camera {
         });
 
         // Create bind group entries
-        let entries = (0..=4)
+        let entries = (0..=6)
             .map(|i| wgpu::BindGroupEntry {
                 binding: i,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
