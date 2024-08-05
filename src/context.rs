@@ -126,9 +126,9 @@ impl GraphicsContext {
             ],
         };
 
-        let sphere_buffers = Sphere::new_sphere_buffers(spheres, &device);
+        let spheres = Sphere::new_sphere_buffers(spheres, &device);
 
-        let pipeline = Pipeline::new(&device, &camera.layout, &sphere_buffers.layout).await;
+        let pipeline = Pipeline::new(&device, &camera.layout, &spheres.layout).await;
 
         Self {
             surface,
@@ -140,7 +140,7 @@ impl GraphicsContext {
 
             pipeline,
             camera,
-            spheres: sphere_buffers,
+            spheres,
         }
     }
 

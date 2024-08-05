@@ -1,6 +1,17 @@
 @group(0) @binding(0)
 var<uniform> camera : Camera;
 
+@group(1) @binding(0)
+var<storage, read> spheres: Spheres;
+
+const SAMPLE_COUNT = 4;
+const SAMPLES = array<vec2<f32>, SAMPLE_COUNT>(
+    vec2<f32>(-0.25, -0.25),
+    vec2<f32>(-0.25,  0.25),
+    vec2<f32>( 0.25, -0.25),
+    vec2<f32>( 0.25,  0.25),
+);
+
 struct Camera {
     dimensions: vec2<f32>,
     focal: f32,
@@ -20,9 +31,6 @@ struct RayHit {
     normal: vec3<f32>,
     colour: vec3<f32>,
 }
-
-@group(1) @binding(0)
-var<storage, read> spheres: Spheres;
 
 struct Spheres {
     @align(16)
@@ -61,11 +69,11 @@ fn hit_sphere(sphere: Sphere, ray: Ray) -> RayHit {
 
     var d: f32 = x * x - y;
 
-    if (d > 0.0) {
+    if d > 0.0 {
         var xy = sqrt(d);
         var root1 = -x - xy;
-        if (root1 >= 0.0) {
-            var ray_hit : RayHit;
+        if root1 >= 0.0 {
+            var ray_hit: RayHit;
             ray_hit.hit = true;
             ray_hit.incoming = ray.dir;
             ray_hit.distance = root1;
@@ -74,8 +82,8 @@ fn hit_sphere(sphere: Sphere, ray: Ray) -> RayHit {
             return ray_hit;
         }
         var root2 = -x + xy;
-        if (root2 >= 0.0) {
-            var ray_hit : RayHit;
+        if root2 >= 0.0 {
+            var ray_hit: RayHit;
             ray_hit.hit = true;
             ray_hit.incoming = ray.dir;
             ray_hit.distance = root2;
@@ -84,19 +92,19 @@ fn hit_sphere(sphere: Sphere, ray: Ray) -> RayHit {
             return ray_hit;
         }
     }
-    var ray_hit : RayHit;
+    var ray_hit: RayHit;
     return ray_hit;
 }
 
 fn ray_colour(ray: Ray) -> vec3<f32> {
-    var hit : bool = false;
-    var closest : RayHit;
+    var hit: bool = false;
+    var closest: RayHit;
     for (var i = 0; i < i32(arrayLength(&spheres.spheres)); i += 1) {
         var sphere = spheres.spheres[i];
         var ray_hit = hit_sphere(spheres.spheres[i], ray);
 
         if ray_hit.hit {
-            if (!hit || closest.distance >= ray_hit.distance) {
+            if !hit || closest.distance >= ray_hit.distance {
                 closest = ray_hit;
                 hit = true;
             }
@@ -105,7 +113,6 @@ fn ray_colour(ray: Ray) -> vec3<f32> {
     if hit {
         var n = closest.normal;
         return closest.colour;
-        // return 0.5 * vec3<f32>(n.x + 1.0, n.y + 1.0, n.z + 1.0);
     }
 
     var a = 0.5 * (normalize(ray.dir).y + 1.0);
@@ -134,16 +141,17 @@ fn calc_ray(screen_pos: vec2<f32>) -> Ray {
     return ray;
 }
 
+fn cast_multiple_rays(origin: vec2<f32>) -> vec3<f32>{
+    var pixel_colour : vec3<f32>;
+    pixel_colour += ray_colour(calc_ray(origin + SAMPLES[0]));
+    pixel_colour += ray_colour(calc_ray(origin + SAMPLES[1]));
+    pixel_colour += ray_colour(calc_ray(origin + SAMPLES[2]));
+    pixel_colour += ray_colour(calc_ray(origin + SAMPLES[3]));
+    return pixel_colour / 4.0;
+}
+
 // Fragment shader
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    var ray: Ray = calc_ray(
-        vec2<f32>(
-            in.clip_position.x, // camera.dimensions.x,
-            in.clip_position.y // camera.dimensions.y
-        )
-    );
-
-    var colour = ray_colour(ray);
-    return vec4<f32>(colour, 1.0);
+    return vec4<f32>(cast_multiple_rays(in.clip_position.xy), 1.0);
 }
