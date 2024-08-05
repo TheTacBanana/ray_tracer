@@ -149,10 +149,10 @@ fn iterative_ray_colour(ray: Ray) -> vec3<f32> {
     for (var depth = 0; depth < camera.max_depth; depth += 1) {
         var hit_out = cast_ray(current_ray);
         if hit_out.hit {
-            // cumulative_colour += colour_multiplier;
+            cumulative_colour += colour_multiplier * hit_out.colour;
             colour_multiplier *= hit_out.reflection;
 
-            var direction = hit_out.normal * 1.0001 + random_in_unit_sphere(&seed);
+            var direction = hit_out.normal * 1.001 + random_in_unit_sphere(&seed);
             current_ray.dir = direction;
             current_ray.pos = hit_out.pos;
         } else {
@@ -202,17 +202,35 @@ fn calc_ray(screen_pos: vec2<f32>) -> Ray {
     return ray;
 }
 
+fn gamma_correction(in: f32) -> f32 {
+    if in > 0.0 {
+        return sqrt(in);
+    } else {
+        return 0.0;
+    }
+}
+
+fn gamma_correction_vec(in: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        gamma_correction(in.x),
+        gamma_correction(in.y),
+        gamma_correction(in.z),
+    );
+}
+
 fn cast_multiple_rays(origin: vec2<f32>) -> vec3<f32> {
     var pixel_colour: vec3<f32>;
     pixel_colour += iterative_ray_colour(calc_ray(origin + SAMPLES[0]));
     pixel_colour += iterative_ray_colour(calc_ray(origin + SAMPLES[1]));
     pixel_colour += iterative_ray_colour(calc_ray(origin + SAMPLES[2]));
     pixel_colour += iterative_ray_colour(calc_ray(origin + SAMPLES[3]));
-    return pixel_colour / 4.0;
+    return gamma_correction_vec(pixel_colour / 4.0);
 }
+
 
 // Fragment shader
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    seed = f32(base_hash(vec2<u32>(in.clip_position.xy)));
     return vec4<f32>(cast_multiple_rays(in.clip_position.xy), 1.0);
 }

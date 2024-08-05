@@ -26,7 +26,7 @@ impl Camera {
             focal: 1.0,
             viewport_height: 2.0,
             pos: [0.0, 0.0, 0.0],
-            max_depth: 5,
+            max_depth: 10,
             _pad: Default::default(),
         };
 
