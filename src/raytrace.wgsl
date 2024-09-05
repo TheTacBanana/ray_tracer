@@ -4,6 +4,8 @@ var<uniform> camera : Camera;
 @group(1) @binding(0)
 var<storage, read> spheres: Spheres;
 
+const EPSILON = 0.0001;
+
 const SAMPLE_COUNT = 4;
 const SAMPLES = array<vec2<f32>, SAMPLE_COUNT>(
     vec2<f32>(-0.25, -0.25),
@@ -95,6 +97,10 @@ fn random_in_unit_sphere(seed: ptr<private, f32>) -> vec3<f32> {
     return r * vec3(sqrt(1. - h.x * h.x) * vec2(sin(phi), cos(phi)), h.x);
 }
 
+fn near_zero(v: vec3<f32>) -> bool {
+    return v.x < EPSILON && v.y < EPSILON && v.z < EPSILON;
+}
+
 fn hit_sphere(sphere: Sphere, ray: Ray) -> RayHit {
     var dif: vec3<f32> = ray.pos - sphere.pos;
     var x: f32 = dot(dif, ray.dir);
@@ -149,12 +155,17 @@ fn iterative_ray_colour(ray: Ray) -> vec3<f32> {
     for (var depth = 0; depth < camera.max_depth; depth += 1) {
         var hit_out = cast_ray(current_ray);
         if hit_out.hit {
-            cumulative_colour += colour_multiplier * hit_out.colour;
+
+            var direction = hit_out.normal * (1.0 + EPSILON) + random_in_unit_sphere(&seed);
+
+            if near_zero(direction) {
+                direction = hit_out.normal * (1.0 + EPSILON);
+            }
+            cumulative_colour += hit_out.colour;
             colour_multiplier *= hit_out.reflection;
 
-            var direction = hit_out.normal * 1.001 + random_in_unit_sphere(&seed);
-            current_ray.dir = direction;
             current_ray.pos = hit_out.pos;
+            current_ray.dir = direction;
         } else {
             cumulative_colour += colour_multiplier * sky_colour(ray);
             break;
